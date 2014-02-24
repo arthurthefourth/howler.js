@@ -162,7 +162,9 @@
     self._volume = o.volume !== undefined ? o.volume : 1;
     self._urls = o.urls || [];
     self._rate = o.rate || 1;
-
+    self._fadeCancel = false;
+    self._isFading = false;
+    self._fadeTimers = [];
     // setup event functions
     self._onload = [o.onload || function() {}];
     self._onloaderror = [o.onloaderror || function() {}];
@@ -755,7 +757,27 @@
 
       return self;
     },
+    /**
+     * Cancel a fade operation currently in place.
+     * @return {Howl}
+     */
+    cancelFade: function(callback) {
+        var self = this;
+        self._fadeCancel = true;
 
+
+        for (var i = 0; i < self._fadeTimers.length; i++) {
+            clearTimeout(self._fadeTimers[i]);
+        }
+        self._fadeTimers.length = 0;
+        self.stop().volume(1.0);
+        if (callback) callback();
+        return self;
+    },
+      isFading: function() {
+          var self = this;
+          return self._isFading;
+      },
     /**
      * Fade a currently playing sound between two volumes.
      * @param  {Number}   from     The volume to fade from (0.0 to 1.0).
@@ -780,23 +802,23 @@
 
         return self;
       }
-
+      self._isFading = true;
       // set the volume to the start position
       self.volume(from, id);
-
       for (var i=1; i<=steps; i++) {
+
         (function() {
           var change = self._volume + (dir === 'up' ? 0.01 : -0.01) * i,
             vol = Math.round(1000 * change) / 1000,
             toVol = to;
+      // store up fadeTimers for later cancellation
 
-          setTimeout(function() {
+          self._fadeTimers.push (setTimeout(function() {
             self.volume(vol, id);
-
             if (vol === toVol) {
               if (callback) callback();
             }
-          }, stepTime * i);
+          }, stepTime * i));
         })();
       }
     },
@@ -825,7 +847,7 @@
 
       return self.fade(self._volume, to, len, function() {
         if (callback) callback();
-        self.pause(id);
+        //self.pause(id);
 
         // fire ended event
         self.on('end');
